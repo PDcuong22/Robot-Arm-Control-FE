@@ -11,7 +11,7 @@ const CONFIG = {
   helpLink: 'https://github.com/arifszn/reforge',
   enablePWA: true,
   theme: {
-    accentColor: '#818cf8',
+    accentColor: '#0850c4',
     sidebarLayout: LayoutType.MIX,
     showBreadcrumb: true,
   },

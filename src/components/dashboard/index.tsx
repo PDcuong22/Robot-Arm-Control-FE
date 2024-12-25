@@ -9,6 +9,7 @@ import {
   Slider,
   Button,
   Modal,
+  Tooltip,
 } from 'antd';
 import { webRoutes } from '../../routes/web';
 import { Link } from 'react-router-dom';
@@ -18,6 +19,10 @@ import { apiRoutes } from '../../routes/api';
 import { handleErrorResponse } from '../../utils';
 import { Review } from '../../interfaces/models/review';
 import robotArmImg from '../../assets/img/RobotArm.png';
+import { AiFillCaretRight } from 'react-icons/ai';
+import { FaEdit } from 'react-icons/fa';
+import { MdDelete } from 'react-icons/md';
+import { InfoCircleOutlined } from '@ant-design/icons';
 
 const breadcrumb: BreadcrumbProps = {
   items: [
@@ -28,10 +33,144 @@ const breadcrumb: BreadcrumbProps = {
   ],
 };
 
+const servoInfo = [
+  { servoId: 1, model: 'TD-8120MG', maxValue: 100, minValue: 0 },
+  { servoId: 2, model: 'TD-8120MG', maxValue: 100, minValue: 0 },
+  { servoId: 3, model: 'MG996R', maxValue: 100, minValue: 0 },
+  { servoId: 4, model: 'MG996R', maxValue: 100, minValue: 0 },
+  { servoId: 5, model: 'MG996R', maxValue: 100, minValue: 0 },
+  { servoId: 6, model: 'MG996R', maxValue: 100, minValue: 0 },
+];
+
 const fakeData: any = [
   {
     _id: '6765980b336c6d71395af86f',
     name: 'test2',
+    timestamp: '2024-12-20T16:14:49.269Z',
+    actions: [
+      {
+        servoId: 0,
+        angle: 45,
+        timeDiff: 100,
+        _id: '6765980b336c6d71395af870',
+      },
+      {
+        servoId: 1,
+        angle: 90,
+        timeDiff: 110,
+        _id: '6765980b336c6d71395af871',
+      },
+      {
+        servoId: 2,
+        angle: 135,
+        timeDiff: 150,
+        _id: '6765980b336c6d71395af872',
+      },
+    ],
+  },
+  {
+    _id: '6765980b336c6d71395af89t',
+    name: 'test3',
+    timestamp: '2024-12-20T16:14:49.269Z',
+    actions: [
+      {
+        servoId: 0,
+        angle: 45,
+        timeDiff: 100,
+        _id: '6765980b336c6d71395af870',
+      },
+      {
+        servoId: 1,
+        angle: 90,
+        timeDiff: 110,
+        _id: '6765980b336c6d71395af871',
+      },
+      {
+        servoId: 2,
+        angle: 135,
+        timeDiff: 150,
+        _id: '6765980b336c6d71395af872',
+      },
+    ],
+  },
+  {
+    _id: '6765980b336c6d71395af89t',
+    name: 'test3',
+    timestamp: '2024-12-20T16:14:49.269Z',
+    actions: [
+      {
+        servoId: 0,
+        angle: 45,
+        timeDiff: 100,
+        _id: '6765980b336c6d71395af870',
+      },
+      {
+        servoId: 1,
+        angle: 90,
+        timeDiff: 110,
+        _id: '6765980b336c6d71395af871',
+      },
+      {
+        servoId: 2,
+        angle: 135,
+        timeDiff: 150,
+        _id: '6765980b336c6d71395af872',
+      },
+    ],
+  },
+  {
+    _id: '6765980b336c6d71395af89t',
+    name: 'test3',
+    timestamp: '2024-12-20T16:14:49.269Z',
+    actions: [
+      {
+        servoId: 0,
+        angle: 45,
+        timeDiff: 100,
+        _id: '6765980b336c6d71395af870',
+      },
+      {
+        servoId: 1,
+        angle: 90,
+        timeDiff: 110,
+        _id: '6765980b336c6d71395af871',
+      },
+      {
+        servoId: 2,
+        angle: 135,
+        timeDiff: 150,
+        _id: '6765980b336c6d71395af872',
+      },
+    ],
+  },
+  {
+    _id: '6765980b336c6d71395af89t',
+    name: 'test3',
+    timestamp: '2024-12-20T16:14:49.269Z',
+    actions: [
+      {
+        servoId: 0,
+        angle: 45,
+        timeDiff: 100,
+        _id: '6765980b336c6d71395af870',
+      },
+      {
+        servoId: 1,
+        angle: 90,
+        timeDiff: 110,
+        _id: '6765980b336c6d71395af871',
+      },
+      {
+        servoId: 2,
+        angle: 135,
+        timeDiff: 150,
+        _id: '6765980b336c6d71395af872',
+      },
+    ],
+  },
+  {
+    _id: '6765980b336c6d71395af89t',
+    name: 'test3',
     timestamp: '2024-12-20T16:14:49.269Z',
     actions: [
       {
@@ -87,6 +226,8 @@ const Dashboard = () => {
   const [reviews, setReviews] = useState<Review[]>([]);
   const [isModalVisible, setIsModalVisible] = useState(false);
   const [selectedAction, setSelectedAction] = useState<any>(null);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(5); // Default page size
 
   const sliderRefs = useRef<(React.RefObject<HTMLInputElement> | null)[]>([]);
 
@@ -184,7 +325,7 @@ const Dashboard = () => {
   return (
     <BasePageContainer breadcrumb={breadcrumb} transparent={true}>
       <Row gutter={24}>
-        <Col xl={8} lg={8} md={8} sm={8} xs={8} style={{ marginBottom: 24 }}>
+        <Col xl={6} lg={6} md={6} sm={8} xs={8} style={{ marginBottom: 24 }}>
           <Card
             bordered={false}
             className="w-full h-full cursor-default"
@@ -192,9 +333,20 @@ const Dashboard = () => {
           >
             <Table
               loading={loading}
-              pagination={false}
+              pagination={{
+                current: currentPage,
+                pageSize: pageSize,
+                total: fakeData.length, // Replace with your API's total record count
+                onChange: (page, pageSize) => {
+                  setCurrentPage(page);
+                  setPageSize(pageSize);
+                },
+              }}
               showHeader={true}
-              dataSource={fakeData}
+              dataSource={fakeData.slice(
+                (currentPage - 1) * pageSize,
+                currentPage * pageSize
+              )}
               columns={[
                 {
                   title: 'Name',
@@ -208,35 +360,73 @@ const Dashboard = () => {
                   key: 'actions',
                   align: 'center',
                   render: (_, record: any) => (
-                    <Button
-                      onClick={() => showModal(record.actions)}
-                      type="primary"
-                    >
-                      Play
-                    </Button>
+                    <div className="flex gap-5 justify-center">
+                      <Tooltip title="Play">
+                        <Button onClick={() => showModal(record.actions)}>
+                          <AiFillCaretRight />
+                        </Button>
+                      </Tooltip>
+                      <Tooltip title="Edit">
+                        <Button onClick={() => showModal(record.actions)}>
+                          <FaEdit />
+                        </Button>
+                      </Tooltip>
+                      <Tooltip title="Delete">
+                        <Button onClick={() => showModal(record.actions)}>
+                          <MdDelete />
+                        </Button>
+                      </Tooltip>
+                    </div>
                   ),
                 },
               ]}
             />
           </Card>
         </Col>
-        <Col xl={8} lg={8} md={8} sm={8} xs={8} style={{ marginBottom: 24 }}>
+        <Col xl={10} lg={10} md={10} sm={8} xs={8} style={{ marginBottom: 24 }}>
           <Card
             bordered={false}
             className="w-full h-full cursor-default"
-            title="Control Panel"
+            title={
+              <div className="flex gap-2 justify-center">
+                <h2
+                  className="text-2xl text-center"
+                  style={{ fontWeight: '700px' }}
+                >
+                  Control Panel
+                </h2>
+                <Tooltip
+                  title={`Hướng dẫn điều khiển: 
+Ấn các phím tương ứng với tên servo đển chọn servo (VD: servo 1 thì ấn phím 1);
+Các phím lên-xuống (tăng-giảm), trái-phải(giảm-tăng) để điều khiển góc quay của servo. `}
+                >
+                  <InfoCircleOutlined />{' '}
+                </Tooltip>
+              </div>
+            }
           >
             {[1, 2, 3, 4, 5, 6].map((num, index) => (
               <div key={index}>
-                <div>Servo {num}</div>
+                <div className="flex gap-2">
+                  <span className="text-lg">Servo {num}</span>
+                  <Tooltip title={`Model: ${servoInfo[index].model}`}>
+                    <InfoCircleOutlined />
+                  </Tooltip>
+                </div>
                 <Slider
                   ref={(el: any) => (sliderRefs.current[index] = el)}
-                  min={0}
-                  max={100}
+                  min={servoInfo[index].minValue}
+                  max={servoInfo[index].maxValue}
                   step={1}
                 />
               </div>
             ))}
+
+            <div className="flex justify-center mt-4 gap-5 mt-10">
+              <Button type="primary">Record</Button>
+              <Button type="primary">Save</Button>
+              <Button type="primary">Play</Button>
+            </div>
           </Card>
         </Col>
         <Col xl={8} lg={8} md={8} sm={8} xs={8} style={{ marginBottom: 24 }}>
