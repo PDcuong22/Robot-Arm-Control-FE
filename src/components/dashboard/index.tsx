@@ -332,6 +332,7 @@ const Dashboard = () => {
             title="Saved Records"
           >
             <Table
+              scroll={{ x: true }}
               loading={loading}
               pagination={{
                 current: currentPage,
