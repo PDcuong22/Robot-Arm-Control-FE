@@ -85,7 +85,7 @@ const RecordList: React.FC<RecordListProps> = ({ records, onPlayRecord }) => {
             align: 'center',
             render: (_, record: any) => (
               <div className="flex gap-5 justify-center">
-                <Tooltip title="Play">
+                <Tooltip title={playingRecordId === record._id ? 'Stop' : 'Play'}>
                   <Button onClick={() => handlePlay(record)}
                     disabled={playingRecordId !== null && playingRecordId !== record._id}>
                     {playingRecordId === record._id ? (

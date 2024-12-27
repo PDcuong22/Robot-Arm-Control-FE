@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Card, Slider, Button, Tooltip } from 'antd';
 import { InfoCircleOutlined } from '@ant-design/icons';
+import { ToastContainer, toast } from 'react-toastify';
 import { set } from 'nprogress';
 
 const servoInfo = [
@@ -144,7 +145,7 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
     }
     try {
       await saveRecord({ name, actions: recordedActions });
-      alert('Lưu thành công!');
+      toast.success('Successfully saved record!');
 
       // Xóa bản ghi và ẩn nút Save
       setRecordedActions([]);
@@ -163,35 +164,26 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
     const interval = setInterval(() => {
       console.log('currentIndex', currentIndex);
       const action = actions[currentIndex];
-      const newSliders = [...sliders];
+      // const newSliders = [...sliders];
       if (currentIndex < 6) {
-        // setSliders((prev) => {
-        //   const newSliders = [...prev];
-        //   if (newSliders[action.servoId] !== action.angle) {
-        //     newSliders[action.servoId] =
-        //       action.angle > newSliders[action.servoId]
-        //         ? newSliders[action.servoId] + 1
-        //         : newSliders[action.servoId] - 1;
-        //   } else {
-        //     currentIndex = currentIndex + 1;
-        //   }
-        //   console.log('sliders', newSliders);
-        //   return newSliders;
-        // });
-
-        if (newSliders[action.servoId] !== action.angle) {
-          newSliders[action.servoId] =
-            action.angle > newSliders[action.servoId]
-              ? newSliders[action.servoId] + 1
-              : newSliders[action.servoId] - 1;
-          setSliders(newSliders);
+        setSliders((prev) => {
+          const newSliders = [...prev];
+          if (newSliders[action.servoId] === action.angle) {
+            currentIndex = currentIndex + 1;
+          } else {
+            
+            newSliders[action.servoId] =
+              action.angle > newSliders[action.servoId]
+                ? newSliders[action.servoId] + 1
+                : newSliders[action.servoId] - 1;
+          }
           console.log('sliders', newSliders);
-        } else {
-          currentIndex = currentIndex + 1;
-        }
+          return newSliders;
+        });
+
       } else {
         // const action = actions[currentIndex];
-        // const newSliders = [...sliders];
+        const newSliders = [...sliders];
         newSliders[action.servoId] = action.angle;
         console.log('sliders', newSliders);
         setSliders(newSliders);
