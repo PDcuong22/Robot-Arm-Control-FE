@@ -1,7 +1,24 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Card, Slider, Button, Tooltip } from 'antd';
+import {
+  Card,
+  Slider,
+  Button,
+  Tooltip,
+  Modal,
+  Form,
+  Input,
+  notification,
+} from 'antd';
 import { InfoCircleOutlined } from '@ant-design/icons';
-import { set } from 'nprogress';
+import { ActionType, ProDescriptions } from '@ant-design/pro-components';
+import { ExclamationCircleOutlined } from '@ant-design/icons';
+import http from '../../../utils/http';
+import {
+  handleErrorResponse,
+  showNotification,
+  NotificationType,
+} from '../../../utils';
+import { apiRoutes } from '../../../routes/api';
 
 const servoInfo = [
   { servoId: 1, model: 'TD-8120MG', maxValue: 180, minValue: 90 },
@@ -37,6 +54,10 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
     { servoId: number; angle: number; timeDiff: number }[]
   >([]);
   const sliderRefs = useRef<(React.RefObject<HTMLInputElement> | null)[]>([]);
+  const actionRef = useRef<ActionType>();
+  const [form] = Form.useForm();
+  const [isModalVisible, setIsModalVisible] = useState(false);
+
   useEffect(() => {
     if (externalActions) {
       setIsPlayingRecordList(true);
@@ -132,79 +153,89 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
     }
   };
 
-  const handleSave = async () => {
-    const name = prompt('Nhập tên cho bản ghi:');
-    if (!name) {
-      alert('Vui lòng nhập tên cho bản ghi.');
-      return;
-    }
-    if (recordNames.includes(name)) {
-      alert('Tên này đã tồn tại, vui lòng chọn tên khác.');
-      return;
-    }
-    try {
-      await saveRecord({ name, actions: recordedActions });
-      alert('Lưu thành công!');
+  const handleSaveRecord = () => {
+    setIsModalVisible(true);
+  };
 
-      // Xóa bản ghi và ẩn nút Save
-      setRecordedActions([]);
-    } catch (error) {
-      if (error instanceof Error) {
-        alert('Lỗi khi lưu bản ghi: ' + error.message);
-      } else {
-        alert('Lỗi khi lưu bản ghi');
+  const handleSave = async () => {
+    try {
+      const values = await form.validateFields();
+
+      if (recordNames.includes(values.name)) {
+        notification.error({
+          message: 'Error',
+          description: 'This name already exists. Please choose another name.',
+        });
+        return;
       }
+
+      await saveRecord({ name: values.name, actions: recordedActions });
+
+      notification.success({
+        message: 'Success',
+        description: 'Record saved successfully!',
+      });
+
+      setRecordedActions([]);
+      setIsModalVisible(false);
+      form.resetFields();
+    } catch (error) {
+      notification.error({
+        message: 'Error',
+        description:
+          error instanceof Error ? error.message : 'Failed to save record',
+      });
     }
   };
 
-  const startLoopingActions = (actions: any) => {
-    // console.log('Start looping actions:', actions);
-    let currentIndex = 0;
+  interface Action {
+    servoId: number;
+    angle: number;
+  }
+
+  const currentIndexRef = useRef(0);
+  const prevSlidersRef = useRef<number[]>([]);
+  const debugTimeRef = useRef(Date.now());
+
+  const startLoopingActions = (actions: Action[]) => {
+    currentIndexRef.current = 0;
+
     const interval = setInterval(() => {
-      console.log('currentIndex', currentIndex);
-      const action = actions[currentIndex];
-      const newSliders = [...sliders];
-      if (currentIndex < 6) {
-        // setSliders((prev) => {
-        //   const newSliders = [...prev];
-        //   if (newSliders[action.servoId] !== action.angle) {
-        //     newSliders[action.servoId] =
-        //       action.angle > newSliders[action.servoId]
-        //         ? newSliders[action.servoId] + 1
-        //         : newSliders[action.servoId] - 1;
-        //   } else {
-        //     currentIndex = currentIndex + 1;
-        //   }
-        //   console.log('sliders', newSliders);
-        //   return newSliders;
-        // });
+      const action = actions[currentIndexRef.current];
+      const currentTime = Date.now();
+
+      setSliders((prev) => {
+        prevSlidersRef.current = prev;
+        const newSliders = [...prev];
 
         if (newSliders[action.servoId] !== action.angle) {
           newSliders[action.servoId] =
             action.angle > newSliders[action.servoId]
               ? newSliders[action.servoId] + 1
               : newSliders[action.servoId] - 1;
-          setSliders(newSliders);
-          console.log('sliders', newSliders);
-        } else {
-          currentIndex = currentIndex + 1;
-        }
-      } else {
-        // const action = actions[currentIndex];
-        // const newSliders = [...sliders];
-        newSliders[action.servoId] = action.angle;
-        console.log('sliders', newSliders);
-        setSliders(newSliders);
-        currentIndex = (currentIndex + 1) % recordedActions.length;
-      }
-      // console.log('sliders', sliders);
-      // const action = actions[currentIndex];
-      // const newSliders = [...sliders];
-      // newSliders[action.servoId] = action.angle;
-      // setSliders(newSliders);
 
-      // currentIndex = (currentIndex + 1) % recordedActions.length;
+          console.log(
+            '%c[Fresh Update]',
+            'color: green',
+            `Time: ${currentTime - debugTimeRef.current}ms`,
+            `Index: ${currentIndexRef.current}`,
+            `Target: ${action.angle}`,
+            `Current: ${newSliders[action.servoId]}`
+          );
+        } else if (prevSlidersRef.current[action.servoId] === action.angle) {
+          currentIndexRef.current =
+            (currentIndexRef.current + 1) % actions.length;
+          console.log(
+            '%c[Index Update]',
+            'color: blue',
+            `New Index: ${currentIndexRef.current}`
+          );
+        }
+
+        return newSliders;
+      });
     }, 500);
+
     setPlayInterval(interval);
   };
 
@@ -213,8 +244,45 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
       clearInterval(playInterval);
       setPlayInterval(null);
     }
-    setIsPlayingRecordList(false);
-    onStopPlaying();
+  };
+
+  const showModalSaveRecord = (user: any) => {
+    modal.confirm({
+      title: 'Are you sure to save this record?',
+      icon: <ExclamationCircleOutlined />,
+      content: (
+        <ProDescriptions column={1} title=" ">
+          <ProDescriptions.Item valueType="avatar" label="Avatar">
+            {user.avatar}
+          </ProDescriptions.Item>
+          <ProDescriptions.Item valueType="text" label="Name">
+            {user.first_name} {user.last_name}
+          </ProDescriptions.Item>
+          <ProDescriptions.Item valueType="text" label="Email">
+            {user.email}
+          </ProDescriptions.Item>
+        </ProDescriptions>
+      ),
+      okButtonProps: {
+        className: 'bg-primary',
+      },
+      onOk: () => {
+        return http
+          .delete(`${apiRoutes.users}/${user.id}`)
+          .then(() => {
+            showNotification(
+              'Success',
+              NotificationType.SUCCESS,
+              'User is deleted.'
+            );
+
+            actionRef.current?.reloadAndRest?.();
+          })
+          .catch((error) => {
+            handleErrorResponse(error);
+          });
+      },
+    });
   };
 
   return (
@@ -276,12 +344,34 @@ Các phím lên-xuống (tăng-giảm), trái-phải(giảm-tăng) để điều
 
           {/* Nút Save */}
           {!isRecording && !isPlaying && recordedActions.length > 0 && (
-            <Button type="primary" onClick={handleSave}>
+            <Button type="primary" onClick={() => handleSaveRecord()}>
               Save
             </Button>
           )}
         </div>
       )}
+      <Modal
+        title="Save Record"
+        open={isModalVisible}
+        onOk={handleSave}
+        onCancel={() => {
+          setIsModalVisible(false);
+          form.resetFields();
+        }}
+      >
+        <Form form={form}>
+          <Form.Item
+            name="name"
+            label="Record Name"
+            rules={[
+              { required: true, message: 'Please input the record name!' },
+              { min: 3, message: 'Name must be at least 3 characters!' },
+            ]}
+          >
+            <Input placeholder="Enter record name" />
+          </Form.Item>
+        </Form>
+      </Modal>
     </Card>
   );
 };
