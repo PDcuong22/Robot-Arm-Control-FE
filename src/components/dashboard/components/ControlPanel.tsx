@@ -10,41 +10,25 @@ import {
   notification,
 } from 'antd';
 import { InfoCircleOutlined } from '@ant-design/icons';
-import { ActionType, ProDescriptions } from '@ant-design/pro-components';
-import { ExclamationCircleOutlined } from '@ant-design/icons';
-import http from '../../../utils/http';
-import {
-  handleErrorResponse,
-  showNotification,
-  NotificationType,
-} from '../../../utils';
-import { apiRoutes } from '../../../routes/api';
+import { ActionType } from '@ant-design/pro-components';
+import { io } from 'socket.io-client';
 
-const servoInfo = [
-  { servoId: 1, model: 'TD-8120MG', maxValue: 180, minValue: 90 },
-  { servoId: 2, model: 'TD-8120MG', maxValue: 180, minValue: 0 },
-  { servoId: 3, model: 'MG996R', maxValue: 180, minValue: 90 },
-  { servoId: 4, model: 'MG996R', maxValue: 150, minValue: 0 },
-  { servoId: 5, model: 'MG996R', maxValue: 180, minValue: 0 },
-  { servoId: 6, model: 'MG996R', maxValue: 120, minValue: 50 },
-];
+const socket = io('http://localhost:5000');
 
 interface ControlPanelProps {
-  // sliders: number[];
-  // setSliders: (sliders: number[]) => void;
   externalActions: any;
   onStopPlaying: () => void;
-  recordNames: string[];
+  records: Array<{ _id: string; name: string; actions: any }>;
+  onSaveRecord: (newRecord: any) => void;
 }
 
 const ControlPanel: React.FC<ControlPanelProps> = ({
-  // sliders,
-  // setSliders,
   externalActions,
   onStopPlaying,
-  recordNames,
+  records,
+  onSaveRecord,
 }) => {
-  const [sliders, setSliders] = useState([180, 90, 90, 90, 90, 90]); // Trạng thái ban đầu
+  const [sliders, setSliders] = useState([180, 60, 180, 80, 90, 90]); // Trạng thái ban đầu
   const [isPlayingRecordList, setIsPlayingRecordList] = useState(false);
   const [playInterval, setPlayInterval] = useState<number | null>(null); // Lưu trữ interval để dừng
   const [isRecording, setIsRecording] = useState(false);
@@ -57,7 +41,14 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
   const actionRef = useRef<ActionType>();
   const [form] = Form.useForm();
   const [isModalVisible, setIsModalVisible] = useState(false);
-
+  const servoInfo = [
+    { servoId: 0, model: 'TD-8120MG', maxValue: 180, minValue: 90 },
+    { servoId: 1, model: 'TD-8120MG', maxValue: 180, minValue: 0 },
+    { servoId: 2, model: 'MG996R', maxValue: 180, minValue: 130 },
+    { servoId: 3, model: 'MG996R', maxValue: 150, minValue: 0 },
+    { servoId: 4, model: 'MG996R', maxValue: 180, minValue: 0 },
+    { servoId: 5, model: 'MG996R', maxValue: 120, minValue: 50 },
+  ];
   useEffect(() => {
     if (externalActions) {
       setIsPlayingRecordList(true);
@@ -85,6 +76,16 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
     };
   }, []);
 
+  useEffect(() => {
+    socket.on('connect', () => {
+      console.log('Connected to server');
+    });
+
+    socket.on('disconnect', () => {
+      console.log('Disconnected from server');
+    });
+  }, []);
+
   const handleSliderChange = (id: number, value: number) => {
     if (isPlaying || isPlayingRecordList) return; // Ngăn không cho phép thay đổi khi đang phát
     const newSliders = [...sliders];
@@ -100,7 +101,7 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
       angle: value,
       timeDiff: timeDiff,
     };
-    //   socket.emit("servo-control", data);
+    socket.emit('servo-control', data);
 
     if (isRecording) {
       setRecordedActions((prevActions) => [...prevActions, data]);
@@ -113,6 +114,7 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
     } else {
       setPrevTime(null); // Reset thời gian trước đó
       setRecordedActions([]); // Bắt đầu ghi mới
+      prevSlidersRef.current = [];
       sliders.forEach((value, index) => {
         const data = {
           servoId: index,
@@ -141,18 +143,6 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
     }
   };
 
-  const saveRecord = async (record: any) => {
-    const response = await fetch('http://localhost:5000/api/record/create', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(record),
-    });
-
-    if (!response.ok) {
-      throw new Error('Failed to save record');
-    }
-  };
-
   const handleSaveRecord = () => {
     setIsModalVisible(true);
   };
@@ -161,7 +151,9 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
     try {
       const values = await form.validateFields();
 
-      if (recordNames.includes(values.name)) {
+      const isDuplicate = records.some((record) => record.name === values.name);
+
+      if (isDuplicate) {
         notification.error({
           message: 'Error',
           description: 'This name already exists. Please choose another name.',
@@ -169,13 +161,28 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
         return;
       }
 
-      await saveRecord({ name: values.name, actions: recordedActions });
+      const response = await fetch('http://localhost:5000/api/record/create', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: values.name, actions: recordedActions }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to save record');
+      }
+
+      const { newRecord } = await response.json();
+
+      if (!newRecord || !newRecord._id) {
+        // console.log('Invalid record data:', newRecord);
+        throw new Error('Invalid record data');
+      }
 
       notification.success({
         message: 'Success',
         description: 'Record saved successfully!',
       });
-
+      onSaveRecord(newRecord);
       setRecordedActions([]);
       setIsModalVisible(false);
       form.resetFields();
@@ -191,50 +198,84 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
   interface Action {
     servoId: number;
     angle: number;
+    timeDiff: number;
   }
 
   const currentIndexRef = useRef(0);
   const prevSlidersRef = useRef<number[]>([]);
-  const debugTimeRef = useRef(Date.now());
+  // const debugTimeRef = useRef(Date.now());
 
   const startLoopingActions = (actions: Action[]) => {
     currentIndexRef.current = 0;
-
+    // console.log('Start Looping Actions:', actions);
     const interval = setInterval(() => {
-      const action = actions[currentIndexRef.current];
-      const currentTime = Date.now();
+      // const action = actions[currentIndexRef.current];
+      // const currentTime = Date.now();
+      if (currentIndexRef.current < 6) {
+        setSliders((prev) => {
+          const newSlider = [...prev];
+          const action = actions[currentIndexRef.current];
+          // console.log('Current Index:', currentIndexRef.current);
+          // console.log('Current Action:', action);
+          // console.log('Current Sliders:', newSlider);
+          // console.log('Sliders index:', newSlider[currentIndexRef.current], "Action angle:", action.angle);
+          // console.log(newSlider[currentIndexRef.current] === action.angle);
+          if (newSlider[currentIndexRef.current] === action.angle) {
+            currentIndexRef.current =
+              (currentIndexRef.current + 1) % actions.length;
+            
+            // socket.emit('servo-control', {
+            //   ...action,
+            //   angle: newSlider[action.servoId],
+            // });
+            // console.log(
+            //   '%c[Fresh Update]',
+            //   'color: green',
+            //   `Time: ${currentTime - debugTimeRef.current}ms`,
+            //   `Index: ${currentIndexRef.current}`,
+            //   `Target: ${action.angle}`,
+            //   `Current: ${newSliders[action.servoId]}`
+            // );
+          } else {
+            const action = actions[currentIndexRef.current];
+            newSlider[currentIndexRef.current] =
+              action.angle > newSlider[currentIndexRef.current]
+                ? newSlider[currentIndexRef.current] + 1
+                : newSlider[currentIndexRef.current] - 1;
+            // console.log({...action, angle: newSlider[action.servoId]});
+            socket.emit('servo-control', {
+              ...action,
+              angle: newSlider[action.servoId],
+            });
 
-      setSliders((prev) => {
-        prevSlidersRef.current = prev;
-        const newSliders = [...prev];
-
-        if (newSliders[action.servoId] !== action.angle) {
-          newSliders[action.servoId] =
-            action.angle > newSliders[action.servoId]
-              ? newSliders[action.servoId] + 1
-              : newSliders[action.servoId] - 1;
-
-          console.log(
-            '%c[Fresh Update]',
-            'color: green',
-            `Time: ${currentTime - debugTimeRef.current}ms`,
-            `Index: ${currentIndexRef.current}`,
-            `Target: ${action.angle}`,
-            `Current: ${newSliders[action.servoId]}`
-          );
-        } else if (prevSlidersRef.current[action.servoId] === action.angle) {
-          currentIndexRef.current =
-            (currentIndexRef.current + 1) % actions.length;
-          console.log(
-            '%c[Index Update]',
-            'color: blue',
-            `New Index: ${currentIndexRef.current}`
-          );
-        }
-
-        return newSliders;
-      });
-    }, 500);
+            // console.log(
+            //   '%c[Index Update]',
+            //   'color: blue',
+            //   `New Index: ${currentIndexRef.current}`
+            // );
+          }
+          prevSlidersRef.current = [
+            newSlider[0],
+            newSlider[1],
+            newSlider[2],
+            newSlider[3],
+            newSlider[4],
+            newSlider[5],
+          ];
+          // console.log("index",currentIndexRef.current ,'Set Sliders:', prevSlidersRef.current);
+          return [...prevSlidersRef.current];
+        });
+      } else {
+        const action = actions[currentIndexRef.current];
+        prevSlidersRef.current[action.servoId] = action.angle;
+        // console.log(action);
+        socket.emit('servo-control', action);
+        // console.log("index",currentIndexRef.current, 'Set Sliders > 5:', prevSlidersRef.current);
+        setSliders([...prevSlidersRef.current]);
+        currentIndexRef.current =
+          (currentIndexRef.current + 1) % actions.length;
+      }
+    }, 50);
 
     setPlayInterval(interval);
   };
@@ -244,45 +285,8 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
       clearInterval(playInterval);
       setPlayInterval(null);
     }
-  };
-
-  const showModalSaveRecord = (user: any) => {
-    modal.confirm({
-      title: 'Are you sure to save this record?',
-      icon: <ExclamationCircleOutlined />,
-      content: (
-        <ProDescriptions column={1} title=" ">
-          <ProDescriptions.Item valueType="avatar" label="Avatar">
-            {user.avatar}
-          </ProDescriptions.Item>
-          <ProDescriptions.Item valueType="text" label="Name">
-            {user.first_name} {user.last_name}
-          </ProDescriptions.Item>
-          <ProDescriptions.Item valueType="text" label="Email">
-            {user.email}
-          </ProDescriptions.Item>
-        </ProDescriptions>
-      ),
-      okButtonProps: {
-        className: 'bg-primary',
-      },
-      onOk: () => {
-        return http
-          .delete(`${apiRoutes.users}/${user.id}`)
-          .then(() => {
-            showNotification(
-              'Success',
-              NotificationType.SUCCESS,
-              'User is deleted.'
-            );
-
-            actionRef.current?.reloadAndRest?.();
-          })
-          .catch((error) => {
-            handleErrorResponse(error);
-          });
-      },
-    });
+    setIsPlayingRecordList(false);
+    onStopPlaying();
   };
 
   return (
@@ -308,14 +312,14 @@ Các phím lên-xuống (tăng-giảm), trái-phải(giảm-tăng) để điều
         <div key={index}>
           <div className="flex gap-2">
             <span className="text-lg">Servo {index + 1}</span>
-            <Tooltip title={`Model: ${servoInfo[index].model}`}>
+            <Tooltip title={`Model: ${servoInfo[index]?.model}`}>
               <InfoCircleOutlined />
             </Tooltip>
           </div>
           <Slider
             ref={(el: any) => (sliderRefs.current[index] = el)}
-            min={servoInfo[index].minValue}
-            max={servoInfo[index].maxValue}
+            min={servoInfo[index]?.minValue}
+            max={servoInfo[index]?.maxValue}
             step={1}
             value={value}
             onChange={(value) => handleSliderChange(index, value)}

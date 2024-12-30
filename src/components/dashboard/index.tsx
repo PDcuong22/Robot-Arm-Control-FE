@@ -3,14 +3,10 @@ import BasePageContainer from '../layout/PageContainer';
 import { BreadcrumbProps, Card, Col, Row } from 'antd';
 import { webRoutes } from '../../routes/web';
 import { Link } from 'react-router-dom';
-import { User } from '../../interfaces/models/user';
-import http from '../../utils/http';
-import { apiRoutes } from '../../routes/api';
-import { handleErrorResponse } from '../../utils';
-import { Review } from '../../interfaces/models/review';
 import robotArmImg from '../../assets/img/RobotArm.png';
 import RecordList from './components/RecordList';
 import ControlPanel from './components/ControlPanel';
+
 const breadcrumb: BreadcrumbProps = {
   items: [
     {
@@ -19,6 +15,8 @@ const breadcrumb: BreadcrumbProps = {
     },
   ],
 };
+
+
 
 
 const Dashboard = () => {
@@ -39,7 +37,6 @@ const Dashboard = () => {
     fetchRecords();
   }, []);
 
-  const recordNames = records.map(record => record.name);
 
   const handlePlayRecord = (actions: any) => {
     setExternalActions(actions);
@@ -49,19 +46,37 @@ const Dashboard = () => {
     setExternalActions(null); // Đặt lại trạng thái khi dừng phát
   };
 
+  const handleSaveRecord = (newRecord: any) => {
+    setRecords([...records, newRecord]);
+  };
+
+  const handleUpdateRecord = (updatedRecord: any) => {
+    setRecords(records.map(record => 
+      record._id === updatedRecord._id ? updatedRecord : record
+    ));
+  };
+
+  const handleDeleteRecord = (deletedRecordId: string) => {
+    // console.log(records.filter(record => record._id !== deletedRecordId));
+    setRecords(records.filter(record => record._id !== deletedRecordId));
+  };
+
   return (
     <BasePageContainer breadcrumb={breadcrumb} transparent={true}>
       <Row gutter={24}>
         <Col xl={6} lg={6} md={6} sm={8} xs={8} style={{ marginBottom: 24 }}>
-          <RecordList records={records} onPlayRecord={handlePlayRecord} />
+          <RecordList records={records} onPlayRecord={handlePlayRecord} 
+          onUpdateRecord={handleUpdateRecord} 
+          onDeleteRecord={handleDeleteRecord} />
         </Col>
         <Col xl={10} lg={10} md={10} sm={8} xs={8} style={{ marginBottom: 24 }}>
           <ControlPanel
             // sliders={sliders}
             // setSliders={setSliders}
+            onSaveRecord={handleSaveRecord}
             externalActions={externalActions}
             onStopPlaying={handleStopPlaying}
-            recordNames={recordNames}
+            records={records}
           />
         </Col>
         <Col xl={8} lg={8} md={8} sm={8} xs={8} style={{ marginBottom: 24 }}>
