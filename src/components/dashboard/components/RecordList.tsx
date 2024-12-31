@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import {
+  App,
   Card,
   Table,
   Button,
@@ -11,7 +12,11 @@ import {
 } from 'antd';
 import { FaEdit } from 'react-icons/fa';
 import { MdDelete } from 'react-icons/md';
-import { PauseCircleTwoTone, PlayCircleTwoTone, ExclamationCircleFilled } from '@ant-design/icons';
+import {
+  PauseCircleTwoTone,
+  PlayCircleTwoTone,
+  ExclamationCircleFilled,
+} from '@ant-design/icons';
 import { set } from 'nprogress';
 
 interface RecordListProps {
@@ -21,7 +26,13 @@ interface RecordListProps {
   onDeleteRecord: (deletedRecordId: string) => void;
 }
 
-const RecordList: React.FC<RecordListProps> = ({ records, onPlayRecord, onUpdateRecord, onDeleteRecord }) => {
+const RecordList: React.FC<RecordListProps> = ({
+  records,
+  onPlayRecord,
+  onUpdateRecord,
+  onDeleteRecord,
+}) => {
+  const { message } = App.useApp();
   const [playingRecordId, setPlayingRecordId] = useState(null);
   const [isEditModalVisible, setIsEditModalVisible] = useState(false);
   const [isDeleteModalVisible, setIsDeleteModalVisible] = useState(false);
@@ -36,7 +47,9 @@ const RecordList: React.FC<RecordListProps> = ({ records, onPlayRecord, onUpdate
       onPlayRecord(null); // Thông báo dừng phát tới ControlPanel
     } else {
       // console.log(record);
-      const actionsWithoutId = record.actions.map(({ _id, ...rest }: any) => rest);
+      const actionsWithoutId = record.actions.map(
+        ({ _id, ...rest }: any) => rest
+      );
       setPlayingRecordId(record._id); // Đặt bản ghi đang phát
       onPlayRecord(actionsWithoutId); // Gửi hành động tới ControlPanel
     }
@@ -56,51 +69,54 @@ const RecordList: React.FC<RecordListProps> = ({ records, onPlayRecord, onUpdate
     try {
       const values = await form.validateFields();
 
-      const isDuplicate = records.some(
-        (record) => record.name === values.name
-      );
+      const isDuplicate = records.some((record) => record.name === values.name);
 
       if (isDuplicate) {
-        notification.error({
-          message: 'Error',
-          description: 'This name already exists. Please choose another name.',
-        });
+        message.error('This name already exists. Please choose another name');
         return;
       }
 
-      const response = await fetch(`http://localhost:5000/api/record/${selectedRecord._id}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: values.name }),
-      });
+      const response = await fetch(
+        `http://localhost:5000/api/record/${selectedRecord._id}`,
+        {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name: values.name }),
+        }
+      );
 
       if (!response.ok) {
         console.log(response);
         throw new Error('Failed to update record');
       }
 
-      notification.success({
-        message: 'Success',
-        description: 'Record updated successfully',
-      });
+      message.success('Record updated successfully');
 
       // Update the UI or state after successful update
       onUpdateRecord({ ...selectedRecord, name: values.name });
       setIsEditModalVisible(false);
     } catch (error) {
-      notification.error({
-              message: 'Error',
-              description:
-                error instanceof Error ? error.message : 'Failed to edit record',
-            });
+      message.error(
+        error instanceof Error ? error.message : 'Failed to edit record'
+      );
     }
   };
 
   const handleDeleteConfirm = async () => {
     try {
-      const response = await fetch(`http://localhost:5000/api/record/${selectedRecord._id}`, {
-        method: 'DELETE',
-      });
+      const response = await fetch(
+        `http://localhost:5000/api/record/${selectedRecord._id}`,
+        {
+          method: 'DELETE',
+        }
+      );
+
+      onDeleteRecord(selectedRecord._id);
+
+      const remainingInPage = records.length % pageSize;
+      if (remainingInPage === 1 && currentPage > 1) {
+        setCurrentPage(currentPage - 1);
+      }
 
       if (!response.ok) {
         throw new Error('Failed to delete record');
@@ -140,10 +156,9 @@ const RecordList: React.FC<RecordListProps> = ({ records, onPlayRecord, onUpdate
           },
         }}
         showHeader={true}
-        dataSource={records.slice(
-          (currentPage - 1) * pageSize,
-          currentPage * pageSize
-        ).map((record) => ({
+        dataSource={records
+          .slice((currentPage - 1) * pageSize, currentPage * pageSize)
+          .map((record) => ({
             ...record,
             key: record._id, // Thêm key vào mỗi phần tử
           }))}
@@ -161,24 +176,35 @@ const RecordList: React.FC<RecordListProps> = ({ records, onPlayRecord, onUpdate
             align: 'center',
             render: (_, record: any) => (
               <div className="flex gap-5 justify-center">
-                <Tooltip title={playingRecordId === record._id ? 'Stop' : 'Play'}>
-                  <Button onClick={() => handlePlay(record)}
-                    disabled={playingRecordId !== null && playingRecordId !== record._id}>
+                <Tooltip
+                  title={playingRecordId === record._id ? 'Stop' : 'Play'}
+                >
+                  <Button
+                    onClick={() => handlePlay(record)}
+                    disabled={
+                      playingRecordId !== null && playingRecordId !== record._id
+                    }
+                  >
                     {playingRecordId === record._id ? (
-                        <PauseCircleTwoTone />
+                      <PauseCircleTwoTone />
                     ) : (
-                        
-                        <PlayCircleTwoTone />
+                      <PlayCircleTwoTone />
                     )}
                   </Button>
                 </Tooltip>
                 <Tooltip title="Edit">
-                  <Button onClick={() => handleEdit(record)} disabled={playingRecordId !== null}>
+                  <Button
+                    onClick={() => handleEdit(record)}
+                    disabled={playingRecordId !== null}
+                  >
                     <FaEdit />
                   </Button>
                 </Tooltip>
                 <Tooltip title="Delete">
-                  <Button onClick={() => handleDelete(record)} disabled={playingRecordId !== null}>
+                  <Button
+                    onClick={() => handleDelete(record)}
+                    disabled={playingRecordId !== null}
+                  >
                     <MdDelete />
                   </Button>
                 </Tooltip>
@@ -213,9 +239,12 @@ const RecordList: React.FC<RecordListProps> = ({ records, onPlayRecord, onUpdate
         onCancel={() => setIsDeleteModalVisible(false)}
         okText="Yes"
         cancelText="No"
-        okType='danger'
-      > 
-        <p>Are you sure you want to delete this record named "{selectedRecord?.name}"?</p>
+        okType="danger"
+      >
+        <p>
+          Are you sure you want to delete this record named "
+          {selectedRecord?.name}"?
+        </p>
       </Modal>
     </Card>
   );

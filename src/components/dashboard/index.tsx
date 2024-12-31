@@ -16,12 +16,9 @@ const breadcrumb: BreadcrumbProps = {
   ],
 };
 
-
-
-
 const Dashboard = () => {
   const [externalActions, setExternalActions] = useState(null); // Hành động phát từ RecordList
-  
+
   const [records, setRecords] = useState<any[]>([]);
 
   useEffect(() => {
@@ -37,7 +34,6 @@ const Dashboard = () => {
     fetchRecords();
   }, []);
 
-
   const handlePlayRecord = (actions: any) => {
     setExternalActions(actions);
   };
@@ -51,23 +47,81 @@ const Dashboard = () => {
   };
 
   const handleUpdateRecord = (updatedRecord: any) => {
-    setRecords(records.map(record => 
-      record._id === updatedRecord._id ? updatedRecord : record
-    ));
+    setRecords(
+      records.map((record) =>
+        record._id === updatedRecord._id ? updatedRecord : record
+      )
+    );
   };
+
+  const fakeData = [
+    {
+      _id: '6765980b336c6d71395af86f',
+      name: 'test2',
+      timestamp: '2024-12-20T16:14:49.269Z',
+      actions: [
+        {
+          servoId: 0,
+          angle: 45,
+          timeDiff: 100,
+          _id: '6765980b336c6d71395af870',
+        },
+        {
+          servoId: 1,
+          angle: 90,
+          timeDiff: 110,
+          _id: '6765980b336c6d71395af871',
+        },
+        {
+          servoId: 2,
+          angle: 135,
+          timeDiff: 150,
+          _id: '6765980b336c6d71395af872',
+        },
+      ],
+    },
+    {
+      _id: '6765980b336c6d71395af858',
+      name: 'test2',
+      timestamp: '2024-12-20T16:14:49.269Z',
+      actions: [
+        {
+          servoId: 0,
+          angle: 45,
+          timeDiff: 100,
+          _id: '6765980b336c6d71395af870',
+        },
+        {
+          servoId: 1,
+          angle: 90,
+          timeDiff: 110,
+          _id: '6765980b336c6d71395af871',
+        },
+        {
+          servoId: 2,
+          angle: 135,
+          timeDiff: 150,
+          _id: '6765980b336c6d71395af872',
+        },
+      ],
+    },
+  ];
 
   const handleDeleteRecord = (deletedRecordId: string) => {
     // console.log(records.filter(record => record._id !== deletedRecordId));
-    setRecords(records.filter(record => record._id !== deletedRecordId));
+    setRecords(records.filter((record) => record._id !== deletedRecordId));
   };
 
   return (
     <BasePageContainer breadcrumb={breadcrumb} transparent={true}>
       <Row gutter={24}>
         <Col xl={6} lg={6} md={6} sm={8} xs={8} style={{ marginBottom: 24 }}>
-          <RecordList records={records} onPlayRecord={handlePlayRecord} 
-          onUpdateRecord={handleUpdateRecord} 
-          onDeleteRecord={handleDeleteRecord} />
+          <RecordList
+            records={fakeData}
+            onPlayRecord={handlePlayRecord}
+            onUpdateRecord={handleUpdateRecord}
+            onDeleteRecord={handleDeleteRecord}
+          />
         </Col>
         <Col xl={10} lg={10} md={10} sm={8} xs={8} style={{ marginBottom: 24 }}>
           <ControlPanel

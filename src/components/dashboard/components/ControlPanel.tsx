@@ -61,6 +61,8 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
   useEffect(() => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const handleKeyDown = (event: { key: any }) => {
+      if (isModalVisible) return;
+
       const key = event.key;
       if (['1', '2', '3', '4', '5', '6'].includes(key)) {
         const index = parseInt(key, 10) - 1;
@@ -74,7 +76,7 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
     return () => {
       document.removeEventListener('keydown', handleKeyDown);
     };
-  }, []);
+  }, [isModalVisible]);
 
   useEffect(() => {
     socket.on('connect', () => {
@@ -141,10 +143,6 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
         alert('Không có hành động nào để phát lại!');
       }
     }
-  };
-
-  const handleSaveRecord = () => {
-    setIsModalVisible(true);
   };
 
   const handleSave = async () => {
@@ -223,7 +221,7 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
           if (newSlider[currentIndexRef.current] === action.angle) {
             currentIndexRef.current =
               (currentIndexRef.current + 1) % actions.length;
-            
+
             // socket.emit('servo-control', {
             //   ...action,
             //   angle: newSlider[action.servoId],
@@ -348,7 +346,7 @@ Các phím lên-xuống (tăng-giảm), trái-phải(giảm-tăng) để điều
 
           {/* Nút Save */}
           {!isRecording && !isPlaying && recordedActions.length > 0 && (
-            <Button type="primary" onClick={() => handleSaveRecord()}>
+            <Button type="primary" onClick={() => setIsModalVisible(true)}>
               Save
             </Button>
           )}
