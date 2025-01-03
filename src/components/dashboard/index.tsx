@@ -54,59 +54,6 @@ const Dashboard = () => {
     );
   };
 
-  const fakeData = [
-    {
-      _id: '6765980b336c6d71395af86f',
-      name: 'test2',
-      timestamp: '2024-12-20T16:14:49.269Z',
-      actions: [
-        {
-          servoId: 0,
-          angle: 45,
-          timeDiff: 100,
-          _id: '6765980b336c6d71395af870',
-        },
-        {
-          servoId: 1,
-          angle: 90,
-          timeDiff: 110,
-          _id: '6765980b336c6d71395af871',
-        },
-        {
-          servoId: 2,
-          angle: 135,
-          timeDiff: 150,
-          _id: '6765980b336c6d71395af872',
-        },
-      ],
-    },
-    {
-      _id: '6765980b336c6d71395af858',
-      name: 'test2',
-      timestamp: '2024-12-20T16:14:49.269Z',
-      actions: [
-        {
-          servoId: 0,
-          angle: 45,
-          timeDiff: 100,
-          _id: '6765980b336c6d71395af870',
-        },
-        {
-          servoId: 1,
-          angle: 90,
-          timeDiff: 110,
-          _id: '6765980b336c6d71395af871',
-        },
-        {
-          servoId: 2,
-          angle: 135,
-          timeDiff: 150,
-          _id: '6765980b336c6d71395af872',
-        },
-      ],
-    },
-  ];
-
   const handleDeleteRecord = (deletedRecordId: string) => {
     // console.log(records.filter(record => record._id !== deletedRecordId));
     setRecords(records.filter((record) => record._id !== deletedRecordId));
@@ -117,7 +64,7 @@ const Dashboard = () => {
       <Row gutter={24}>
         <Col xl={6} lg={6} md={6} sm={8} xs={8} style={{ marginBottom: 24 }}>
           <RecordList
-            records={fakeData}
+            records={records}
             onPlayRecord={handlePlayRecord}
             onUpdateRecord={handleUpdateRecord}
             onDeleteRecord={handleDeleteRecord}

@@ -8,9 +8,9 @@ import {
   Form,
   Input,
   notification,
+  Spin,
 } from 'antd';
-import { InfoCircleOutlined } from '@ant-design/icons';
-import { ActionType } from '@ant-design/pro-components';
+import { InfoCircleOutlined, LoadingOutlined } from '@ant-design/icons';
 import { io } from 'socket.io-client';
 
 const socket = io('http://localhost:5000');
@@ -22,25 +22,30 @@ interface ControlPanelProps {
   onSaveRecord: (newRecord: any) => void;
 }
 
+interface Action {
+  servoId: number;
+  angle: number;
+  timeDiff: number;
+}
+
 const ControlPanel: React.FC<ControlPanelProps> = ({
   externalActions,
   onStopPlaying,
   records,
   onSaveRecord,
 }) => {
-  const [sliders, setSliders] = useState([180, 60, 180, 80, 90, 90]); // Trạng thái ban đầu
+  const [sliders, setSliders] = useState([180, 60, 180, 80, 90, 90]);
   const [isPlayingRecordList, setIsPlayingRecordList] = useState(false);
-  const [playInterval, setPlayInterval] = useState<number | null>(null); // Lưu trữ interval để dừng
+  const [playInterval, setPlayInterval] = useState<number | null>(null);
   const [isRecording, setIsRecording] = useState(false);
-  const [isPlaying, setIsPlaying] = useState(false); // Trạng thái đang phát lại
-  const [prevTime, setPrevTime] = useState<number | null>(null); // Thời gian thay đổi trước đó
-  const [recordedActions, setRecordedActions] = useState<
-    { servoId: number; angle: number; timeDiff: number }[]
-  >([]);
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [prevTime, setPrevTime] = useState<number | null>(null);
+  const [recordedActions, setRecordedActions] = useState<Action[]>([]);
   const sliderRefs = useRef<(React.RefObject<HTMLInputElement> | null)[]>([]);
-  const actionRef = useRef<ActionType>();
   const [form] = Form.useForm();
   const [isModalVisible, setIsModalVisible] = useState(false);
+  const [ESPStatus, setESPStatus] = useState(false);
+  // Thông tin về các servo
   const servoInfo = [
     { servoId: 0, model: 'TD-8120MG', maxValue: 180, minValue: 90 },
     { servoId: 1, model: 'TD-8120MG', maxValue: 180, minValue: 0 },
@@ -49,6 +54,7 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
     { servoId: 4, model: 'MG996R', maxValue: 180, minValue: 0 },
     { servoId: 5, model: 'MG996R', maxValue: 120, minValue: 50 },
   ];
+
   useEffect(() => {
     if (externalActions) {
       setIsPlayingRecordList(true);
@@ -58,8 +64,8 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
     }
   }, [externalActions]);
 
+  // xử lý sự kiện ấn phím số để chọn servo
   useEffect(() => {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const handleKeyDown = (event: { key: any }) => {
       if (isModalVisible) return;
 
@@ -78,6 +84,7 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
     };
   }, [isModalVisible]);
 
+  // Kết nối với server
   useEffect(() => {
     socket.on('connect', () => {
       console.log('Connected to server');
@@ -86,14 +93,23 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
     socket.on('disconnect', () => {
       console.log('Disconnected from server');
     });
+
+    socket.on('ESP-status', (data: any) => {
+      // console.log('ESP status:', data);
+      const { status, currentServos } = data;
+      setESPStatus(status);
+      if (status) {
+        setSliders(currentServos);
+      }
+    });
   }, []);
 
+  // Xử lý khi thay đổi giá trị thanh trượt
   const handleSliderChange = (id: number, value: number) => {
     if (isPlaying || isPlayingRecordList) return; // Ngăn không cho phép thay đổi khi đang phát
     const newSliders = [...sliders];
     newSliders[id] = value;
     setSliders(newSliders);
-    // console.log(sliders);
 
     const currentTime = Date.now(); // Lấy thời gian hiện tại
     const timeDiff = prevTime !== null ? currentTime - prevTime : 0; // Tính thời gian chênh lệch
@@ -105,11 +121,13 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
     };
     socket.emit('servo-control', data);
 
+    // Nếu đang ghi thì lưu lại hành động
     if (isRecording) {
       setRecordedActions((prevActions) => [...prevActions, data]);
     }
   };
 
+  // Xử lý sự kiên ấn nút Record
   const handleRecord = () => {
     if (isRecording) {
       setIsRecording(false); // Kết thúc ghi
@@ -117,6 +135,7 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
       setPrevTime(null); // Reset thời gian trước đó
       setRecordedActions([]); // Bắt đầu ghi mới
       prevSlidersRef.current = [];
+      //Lấy các vị trí của servo lúc bắt đầu
       sliders.forEach((value, index) => {
         const data = {
           servoId: index,
@@ -129,14 +148,13 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
     }
   };
 
+  // xử lý sự kiên ấn nút Play
   const handlePlay = () => {
     if (isPlaying) {
-      setIsPlaying(false); // Dừng phát lại
+      setIsPlaying(false); // Dừng phát
       stopLoopingActions();
     } else {
       if (recordedActions.length > 6) {
-        // console.log('Playing actions:', recordedActions);
-        // Thêm logic phát lại tại đây
         setIsPlaying(true);
         startLoopingActions(recordedActions);
       } else {
@@ -145,10 +163,10 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
     }
   };
 
+  // Xử lý sự kiện lưu bản ghi
   const handleSave = async () => {
     try {
       const values = await form.validateFields();
-
       const isDuplicate = records.some((record) => record.name === values.name);
 
       if (isDuplicate) {
@@ -172,7 +190,6 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
       const { newRecord } = await response.json();
 
       if (!newRecord || !newRecord._id) {
-        // console.log('Invalid record data:', newRecord);
         throw new Error('Invalid record data');
       }
 
@@ -193,91 +210,61 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
     }
   };
 
-  interface Action {
-    servoId: number;
-    angle: number;
-    timeDiff: number;
-  }
-
   const currentIndexRef = useRef(0);
   const prevSlidersRef = useRef<number[]>([]);
-  // const debugTimeRef = useRef(Date.now());
+
+  // Xử lý phát lại các hành động đã ghi
 
   const startLoopingActions = (actions: Action[]) => {
     currentIndexRef.current = 0;
-    // console.log('Start Looping Actions:', actions);
+
+    // Bước đầu tiên là đưa các servo từ vị trí hiện tại về vị trí bắt đầu của mỗi servo
     const interval = setInterval(() => {
-      // const action = actions[currentIndexRef.current];
-      // const currentTime = Date.now();
-      if (currentIndexRef.current < 6) {
-        setSliders((prev) => {
-          const newSlider = [...prev];
-          const action = actions[currentIndexRef.current];
-          // console.log('Current Index:', currentIndexRef.current);
-          // console.log('Current Action:', action);
-          // console.log('Current Sliders:', newSlider);
-          // console.log('Sliders index:', newSlider[currentIndexRef.current], "Action angle:", action.angle);
-          // console.log(newSlider[currentIndexRef.current] === action.angle);
-          if (newSlider[currentIndexRef.current] === action.angle) {
-            currentIndexRef.current =
-              (currentIndexRef.current + 1) % actions.length;
-
-            // socket.emit('servo-control', {
-            //   ...action,
-            //   angle: newSlider[action.servoId],
-            // });
-            // console.log(
-            //   '%c[Fresh Update]',
-            //   'color: green',
-            //   `Time: ${currentTime - debugTimeRef.current}ms`,
-            //   `Index: ${currentIndexRef.current}`,
-            //   `Target: ${action.angle}`,
-            //   `Current: ${newSliders[action.servoId]}`
-            // );
-          } else {
+      if (ESPStatus) {
+        if (currentIndexRef.current < 6) {
+          setSliders((prev) => {
+            const newSlider = [...prev];
             const action = actions[currentIndexRef.current];
-            newSlider[currentIndexRef.current] =
-              action.angle > newSlider[currentIndexRef.current]
-                ? newSlider[currentIndexRef.current] + 1
-                : newSlider[currentIndexRef.current] - 1;
-            // console.log({...action, angle: newSlider[action.servoId]});
-            socket.emit('servo-control', {
-              ...action,
-              angle: newSlider[action.servoId],
-            });
-
-            // console.log(
-            //   '%c[Index Update]',
-            //   'color: blue',
-            //   `New Index: ${currentIndexRef.current}`
-            // );
-          }
-          prevSlidersRef.current = [
-            newSlider[0],
-            newSlider[1],
-            newSlider[2],
-            newSlider[3],
-            newSlider[4],
-            newSlider[5],
-          ];
-          // console.log("index",currentIndexRef.current ,'Set Sliders:', prevSlidersRef.current);
-          return [...prevSlidersRef.current];
-        });
-      } else {
-        const action = actions[currentIndexRef.current];
-        prevSlidersRef.current[action.servoId] = action.angle;
-        // console.log(action);
-        socket.emit('servo-control', action);
-        // console.log("index",currentIndexRef.current, 'Set Sliders > 5:', prevSlidersRef.current);
-        setSliders([...prevSlidersRef.current]);
-        currentIndexRef.current =
-          (currentIndexRef.current + 1) % actions.length;
+            if (newSlider[currentIndexRef.current] === action.angle) {
+              currentIndexRef.current =
+                (currentIndexRef.current + 1) % actions.length;
+            } else {
+              const action = actions[currentIndexRef.current];
+              newSlider[currentIndexRef.current] =
+                action.angle > newSlider[currentIndexRef.current]
+                  ? newSlider[currentIndexRef.current] + 1
+                  : newSlider[currentIndexRef.current] - 1;
+              socket.emit('servo-control', {
+                ...action,
+                angle: newSlider[action.servoId],
+              });
+            }
+            prevSlidersRef.current = [
+              newSlider[0],
+              newSlider[1],
+              newSlider[2],
+              newSlider[3],
+              newSlider[4],
+              newSlider[5],
+            ];
+            return [...prevSlidersRef.current];
+          });
+        } else {
+          // Phát lại các hành động đã ghi
+          const action = actions[currentIndexRef.current];
+          prevSlidersRef.current[action.servoId] = action.angle;
+          socket.emit('servo-control', action);
+          setSliders([...prevSlidersRef.current]);
+          currentIndexRef.current =
+            (currentIndexRef.current + 1) % actions.length;
+        }
       }
     }, 50);
 
     setPlayInterval(interval);
   };
 
+  // Dừng phát lại các hành động
   const stopLoopingActions = () => {
     if (playInterval) {
       clearInterval(playInterval);
@@ -338,14 +325,14 @@ Các phím lên-xuống (tăng-giảm), trái-phải(giảm-tăng) để điều
               Stop Recording
             </Button>
           )}
-          {!isRecording && recordedActions.length > 0 && (
+          {!isRecording && recordedActions.length > 6 && (
             <Button onClick={handlePlay} type="primary">
               {isPlaying ? 'Stop Playing' : 'Play'}
             </Button>
           )}
 
           {/* Nút Save */}
-          {!isRecording && !isPlaying && recordedActions.length > 0 && (
+          {!isRecording && !isPlaying && recordedActions.length > 6 && (
             <Button type="primary" onClick={() => setIsModalVisible(true)}>
               Save
             </Button>
@@ -373,6 +360,15 @@ Các phím lên-xuống (tăng-giảm), trái-phải(giảm-tăng) để điều
             <Input placeholder="Enter record name" />
           </Form.Item>
         </Form>
+      </Modal>
+      <Modal
+        title="ESP disconnected!!"
+        open={!ESPStatus}
+        footer={null}
+        closable={false}
+        style={{ textAlign: 'center' }}
+      >
+        <Spin indicator={<LoadingOutlined spin />} />
       </Modal>
     </Card>
   );
